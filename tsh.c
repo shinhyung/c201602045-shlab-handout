@@ -1,7 +1,7 @@
-/* 
+/* 201602045 이신형
  * tsh - A tiny shell program with job control
  *
- *201602045 test
+ *
  * <Put your name and login ID here>
  */
 #include <stdio.h>
@@ -25,7 +25,6 @@
 #define MAXARGS     128   /* max args on a command line */
 #define MAXJOBS      16   /* max jobs at any point in time */
 #define MAXJID    1<<16   /* max job ID */
-
 
 /* 
  * Jobs states: FG (foreground), BG (background), ST (stopped)
@@ -169,13 +168,26 @@ int main(int argc, char **argv)
  */
 void eval(char *cmdline) 
 {
+	char  *argv[MAXARGS];
+	//command 저장
+	//process ID
+	//명령어를 parseline 을 통해 분리
+	parseline(cmdline,argv);
+	//parsing 된 명령어를 저장
+	builtin_cmd(argv);
+
 	return;
+
 }
 
 int builtin_cmd(char **argv)
 {
-	return 0;
-}
+	char *cmd=argv[0];
+	if(!strcmp(cmd,"quit")){//quit command
+	exit(0);
+	}
+	return 0;//not a builtin command
+	} 
 
 void waitfg(pid_t pid, int output_fd)
 {
