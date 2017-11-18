@@ -1,4 +1,5 @@
 /* 201602045 이신형
+
  * tsh - A tiny shell program with job control
  *
  *
@@ -169,16 +170,27 @@ int main(int argc, char **argv)
 void eval(char *cmdline) 
 {
 	char  *argv[MAXARGS];
+	int bg;	
 	pid_t pid;
-	parseline(cmdline,argv);//parsing 된 명령어를 저장
+
+	bg=parseline(cmdline,argv);
+
 	if(!builtin_cmd(argv)){
-		if((pid=fork())<0){
+		if((pid=fork())==0){
 			if(execve(argv[0],argv,environ)<0){
 				printf("%s:Command not found\n,argv");
 				exit(0);
 			}
 		}
+
+		if(!bg){
+			int status;
+			if(waitpid(pid,&status,0)<0)
+				unix_error("waitfg:waitpid error");
 	}
+		else
+			printf("%d %s",pid,cmdline);
+		}
 	return;
 
 }
@@ -383,6 +395,13 @@ pid_t fgpid(struct job_t *jobs) {
 			return jobs[i].pid;
 	return 0;
 }
+struct Job_t{
+	pid_t pid;
+	int jid;
+	int state;
+	char cmdline[MAXLINE];
+};
+struct Job_t Jobs[MAXJOBS];
 
 /* getjobpid  - Find a job (by PID) on the job list */
 struct job_t *getjobpid(struct job_t *jobs, pid_t pid) {
