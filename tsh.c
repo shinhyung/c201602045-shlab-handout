@@ -170,27 +170,23 @@ int main(int argc, char **argv)
 void eval(char *cmdline) 
 {
 	char  *argv[MAXARGS];
-	int bg;	
 	pid_t pid;
 
-	bg=parseline(cmdline,argv);
+	parseline(cmdline,argv);
+	//bg2=parseline(cmdline,args);
+	//listjobs(Jobs[MAXJOBS],jobs);
 
 	if(!builtin_cmd(argv)){
-		if((pid=fork())==0){
-			if(execve(argv[0],argv,environ)<0){
-				printf("%s:Command not found\n,argv");
+		if((pid=fork())<0){
+			unix_error("fork error");
+		}
+		else if((pid=fork())==0){
+			if((execve(argv[0],argv,environ)<0)){
+				printf("%s:Command not found\n",argv);
 				exit(0);
 			}
 		}
-
-		if(!bg){
-			int status;
-			if(waitpid(pid,&status,0)<0)
-				unix_error("waitfg:waitpid error");
 	}
-		else
-			printf("%d %s",pid,cmdline);
-		}
 	return;
 
 }
