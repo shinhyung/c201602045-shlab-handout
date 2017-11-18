@@ -171,24 +171,30 @@ void eval(char *cmdline)
 {
 	char  *argv[MAXARGS];
 	pid_t pid;
-
-	parseline(cmdline,argv);
-	//bg2=parseline(cmdline,args);
-	//listjobs(Jobs[MAXJOBS],jobs);
+	int bg;
+	
+	bg=parseline(cmdline,argv);
+	
 
 	if(!builtin_cmd(argv)){
-		if((pid=fork())<0){
-			unix_error("fork error");
-		}
-		else if((pid=fork())==0){
-			if((execve(argv[0],argv,environ)<0)){
-				printf("%s:Command not found\n",argv);
-				exit(0);
-			}
+		if((pid=fork())==0){
+			if(execve(argv[0],argv,environ)<0){
+			printf("%s:Command not found\n",argv);
+			exit(0);
 		}
 	}
-	return;
+	}
+	if(bg){
+		addjob(jobs,pid,BG,cmdline);
+		printf("(%d)(%d)%s",pid2jid(pid),pid,cmdline);
+	}
+	else if(!bg){
+		int status;
+		if(waitpid(pid,&status,0)<0)
+			unix_error("waitfg:waitpid error");
 
+	}
+	return;
 }
 
 int builtin_cmd(char **argv)
@@ -391,13 +397,7 @@ pid_t fgpid(struct job_t *jobs) {
 			return jobs[i].pid;
 	return 0;
 }
-struct Job_t{
-	pid_t pid;
-	int jid;
-	int state;
-	char cmdline[MAXLINE];
-};
-struct Job_t Jobs[MAXJOBS];
+
 
 /* getjobpid  - Find a job (by PID) on the job list */
 struct job_t *getjobpid(struct job_t *jobs, pid_t pid) {
