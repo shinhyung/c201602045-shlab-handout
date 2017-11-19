@@ -178,7 +178,7 @@ void eval(char *cmdline)
 
 	if(!builtin_cmd(argv)){
 		if((pid=fork())==0){
-			if(execve(argv[0],argv,environ)<0){
+			if((execve(argv[0],argv,environ)<0)){
 			printf("%s:Command not found\n",argv);
 			exit(0);
 		}
@@ -190,20 +190,25 @@ void eval(char *cmdline)
 	}
 	else if(!bg){
 		int status;
-		if(waitpid(pid,&status,0)<0)
-			unix_error("waitfg:waitpid error");
-
+		waitpid(pid,&status,0);
+		
 	}
+
 	return;
 }
 
 int builtin_cmd(char **argv)
 {
 	char *cmd=argv[0];
-	if(!strcmp(cmd,"quit")){//quit command
-	exit(0);
+	if(!strcmp(cmd,"quit")){
+		exit(0);
 	}
-	return 0;//not a builtin command
+	if(!strcmp(cmd,"jobs")){//해당 명령어가 quit인 경우 종료
+	 	listjobs(jobs,STDOUT_FILENO);
+		return 1;
+	}
+	return 0;
+	//not a builtin command
 	} 
 
 void waitfg(pid_t pid, int output_fd)
