@@ -188,7 +188,7 @@ void eval(char *cmdline)
 		if((pid=fork())==0)
 		{
 			sigprocmask(SIG_UNBLOCK,&mask,NULL);
-			setpgid(0,0);
+			setpgid(pid,0);
 			if((execve(argv[0],argv,environ)<0)){
 				printf("%s: Command not found\n",argv);
 				exit(0);
@@ -311,7 +311,7 @@ void sigint_handler(int sig)
 	if(!pid)
 		return;
 	else
-		kill(pid,sig);
+		kill(-pid,sig);
 		return;
 	}
 
@@ -327,7 +327,7 @@ void sigtstp_handler(int sig)
 	if(!pid)
 		return;
 	else
-	kill(pid,sig);
+	kill(-pid,sig);
 
 	return;
 }
