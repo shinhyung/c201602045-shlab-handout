@@ -1,5 +1,6 @@
 /* 201602045 이신형
 
+
  * tsh - A tiny shell program with job control
  *
  *
@@ -169,31 +170,43 @@ int main(int argc, char **argv)
  */
 void eval(char *cmdline) 
 {
-	char  *argv[MAXARGS];
+	char *argv[MAXARGS];
 	pid_t pid;
 	int bg;
-	
-	bg=parseline(cmdline,argv);
-	
+	sigset_t mask;
 
+	bg=parseline(cmdline,argv);
+
+	sigemptyset(&mask);//delete all signal set
+	sigaddset(&mask,SIGCHLD);
+	sigaddset(&mask,SIGINT);
+	sigaddset(&mask,SIGTSTP);
+	sigprocmask(SIG_BLOCK,&mask,NULL);
+
+	
 	if(!builtin_cmd(argv)){
-		if((pid=fork())==0){
+		if((pid=fork())==0)
+		{
+			sigprocmask(SIG_UNBLOCK,&mask,NULL);
+			setpgid(0,0);
 			if((execve(argv[0],argv,environ)<0)){
-			printf("%s:Command not found\n",argv);
-			exit(0);
+				printf("%s: Command not found\n",argv);
+				exit(0);
+				}
 		}
-	}
-	}
+
 	if(bg){
 		addjob(jobs,pid,BG,cmdline);
-		printf("(%d)(%d)%s",pid2jid(pid),pid,cmdline);
+		sigprocmask(SIG_UNBLOCK,&mask,NULL);
+		printf("(%d)(%d) %s",pid2jid(pid),pid,cmdline);
 	}
 	else if(!bg){
 		int status;
-		waitpid(pid,&status,0);
-		
+		addjob(jobs,pid,FG,cmdline);
+		sigprocmask(SIG_UNBLOCK,&mask,NULL);
+		waitfg(pid,STDOUT_FILENO);
 	}
-
+	}
 	return;
 }
 
@@ -202,9 +215,9 @@ int builtin_cmd(char **argv)
 	char *cmd=argv[0];
 	if(!strcmp(cmd,"quit")){
 		exit(0);
-	}
-	if(!strcmp(cmd,"jobs")){//해당 명령어가 quit인 경우 종료
-	 	listjobs(jobs,STDOUT_FILENO);
+	}	
+	if(!strcmp(cmd,"jobs")){
+		listjobs(jobs,STDOUT_FILENO);
 		return 1;
 	}
 	return 0;
@@ -213,6 +226,23 @@ int builtin_cmd(char **argv)
 
 void waitfg(pid_t pid, int output_fd)
 {
+	struct job_t *job=getjobpid(jobs,pid);
+	char buf[MAXLINE];
+
+	while(job->pid==pid&&job->state==FG){
+		sleep(1);
+	}
+		if(verbose)
+		{
+			memset(buf,'\0',MAXLINE);
+				sprintf(buf,"waitfg:Process(%d)no longer the fg process\n",(int)pid);
+		
+			if(write(output_fd,buf,strlen(buf))<0)
+			{
+				fprintf(stderr,"Error writing to file\n ");
+				exit(1);
+	}
+		}
 	return;
 }
 
@@ -229,9 +259,30 @@ void waitfg(pid_t pid, int output_fd)
  */
 void sigchld_handler(int sig) 
 {
+	//struct job_t *jobs;
+	int jobpid;
+	pid_t pid;
+	int child_status; 
+	while((pid=waitpid(-1,&child_status,WNOHANG|WUNTRACED))>0){//reap a zombie childern
+		jobpid=pid2jid(pid);
+		if(WIFEXITED(child_status)){
+			deletejob(jobs,pid);
+		}
+		else if(WIFSIGNALED(child_status)){
+			printf("Job[%d](%d)terminated by signal %d\n"
+					,jobpid,(int)pid,WTERMSIG(child_status));
+			deletejob(jobs,pid);
+		}
+		else if(WIFSTOPPED(child_status))
+		{	
+			getjobpid(jobs,pid)->state=ST;
+			printf("Job[%d](%d)stopped by signal%d\n",jobpid,(int)pid,WSTOPSIG(child_status));
+
+
+		}
+		}
 	return;
 }
-
 /* 
  * sigint_handler - The kernel sends a SIGINT to the shell whenver the
  *    user types ctrl-c at the keyboard.  Catch it and send it along
@@ -239,8 +290,17 @@ void sigchld_handler(int sig)
  */
 void sigint_handler(int sig) 
 {
+ 	pid_t pid;
+	pid=fgpid(jobs);
+	if(!pid){
+		return;
+	}
+	else{
+	kill(pid,sig);
+	return 1;
+	}
 	return;
-}
+	}
 
 /*
  * sigtstp_handler - The kernel sends a SIGTSTP to the shell whenever
@@ -249,6 +309,15 @@ void sigint_handler(int sig)
  */
 void sigtstp_handler(int sig) 
 {
+	pid_t pid;
+	pid=fgpid(jobs);
+	if(!pid){
+		return;
+	}
+	else{
+	kill(pid,sig);
+	return 1;
+	}
 	return;
 }
 
@@ -468,9 +537,7 @@ void listjobs(struct job_t *jobs, int output_fd)
 				case ST:
 					sprintf(buf, "Stopped    ");
 					break;
-				default:
-					sprintf(buf, "listjobs: Internal error: job[%d].state=%d ",
-							i, jobs[i].state);
+				default:sprintf(buf, "listjobs: Internal error: job[%d].state=%d ",i, jobs[i].state);
 			}
 			if(write(output_fd, buf, strlen(buf)) < 0) {
 				fprintf(stderr, "Error writing to output file\n");
