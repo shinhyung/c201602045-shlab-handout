@@ -201,7 +201,6 @@ void eval(char *cmdline)
 		printf("(%d)(%d) %s",pid2jid(pid),pid,cmdline);
 	}
 	else if(!bg){
-		int status;
 		addjob(jobs,pid,FG,cmdline);
 		sigprocmask(SIG_UNBLOCK,&mask,NULL);
 		waitfg(pid,STDOUT_FILENO);
@@ -226,23 +225,15 @@ int builtin_cmd(char **argv)
 
 void waitfg(pid_t pid, int output_fd)
 {
-	struct job_t *job=getjobpid(jobs,pid);
-	char buf[MAXLINE];
-
-	while(job->pid==pid&&job->state==FG){
-		sleep(1);
-	}
-		if(verbose)
-		{
-			memset(buf,'\0',MAXLINE);
-				sprintf(buf,"waitfg:Process(%d)no longer the fg process\n",(int)pid);
-		
-			if(write(output_fd,buf,strlen(buf))<0)
-			{
-				fprintf(stderr,"Error writing to file\n ");
-				exit(1);
-	}
+	while(1){
+		if(pid!=fgpid(jobs)){
+			if(verbose) 
+				printf("waitfg:Process(%d)no longer the fg process\n",pid);
+			break;
+		}else{
+				sleep(1);
 		}
+	}
 	return;
 }
 
@@ -270,13 +261,13 @@ void sigchld_handler(int sig)
 		}
 		else if(WIFSIGNALED(child_status)){
 			printf("Job[%d](%d)terminated by signal %d\n"
-					,jobpid,(int)pid,WTERMSIG(child_status));
+					,jobpid,pid,WTERMSIG(child_status));
 			deletejob(jobs,pid);
 		}
 		else if(WIFSTOPPED(child_status))
 		{	
 			getjobpid(jobs,pid)->state=ST;
-			printf("Job[%d](%d)stopped by signal%d\n",jobpid,(int)pid,WSTOPSIG(child_status));
+			printf("Job[%d](%d)stopped by signal%d\n",jobpid,pid,WSTOPSIG(child_status));
 
 
 		}
@@ -292,14 +283,12 @@ void sigint_handler(int sig)
 {
  	pid_t pid;
 	pid=fgpid(jobs);
-	if(!pid){
-		return;
-	}
-	else{
 	kill(pid,sig);
-	return 1;
-	}
-	return;
+	if(!pid)
+		return;
+	else
+		kill(pid,sig);
+		return;
 	}
 
 /*
@@ -311,13 +300,11 @@ void sigtstp_handler(int sig)
 {
 	pid_t pid;
 	pid=fgpid(jobs);
-	if(!pid){
+	if(!pid)
 		return;
-	}
-	else{
+	else
 	kill(pid,sig);
-	return 1;
-	}
+
 	return;
 }
 
