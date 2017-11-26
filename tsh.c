@@ -212,12 +212,36 @@ void eval(char *cmdline)
 int builtin_cmd(char **argv)
 {
 	char *cmd=argv[0];
+	struct job_t *job;
+	int pid=0;
+
 	if(!strcmp(cmd,"quit")){
 		exit(0);
 	}	
 	if(!strcmp(cmd,"jobs")){
 		listjobs(jobs,STDOUT_FILENO);
 		return 1;
+	}
+	if(!strcmp(cmd,"bg")){
+		if(argv[1]==NULL){
+			return 1;
+		}
+		else{
+			sscanf(argv[1]+1,"%d",&pid);
+			job=getjobjid(jobs,pid);
+			job->state=BG;
+			kill(job->pid,SIGCONT);
+			printf("[%d](%d)%s",job->jid,job->pid,job->cmdline);
+			return 1;
+		}
+	}
+		else if(!strcmp(cmd,"fg")){
+			sscanf(argv[1]+1,"%d",&pid);
+			job=getjobjid(jobs,pid);
+			job->state=FG;
+			kill(job->pid,SIGCONT);
+			waitfg(pid,1);
+			return 1;
 	}
 	return 0;
 	//not a builtin command
