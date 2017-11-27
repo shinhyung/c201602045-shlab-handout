@@ -240,7 +240,6 @@ int builtin_cmd(char **argv)
 			job=getjobjid(jobs,pid);
 			job->state=FG;
 			kill(job->pid,SIGCONT);
-			waitfg(pid,1);
 			return 1;
 	}
 	return 0;
