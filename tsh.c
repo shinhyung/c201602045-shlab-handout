@@ -306,7 +306,6 @@ void sigint_handler(int sig)
 {
  	pid_t pid;
 	pid=fgpid(jobs);
-	kill(pid,sig);
 	if(!pid)
 		return;
 	else
